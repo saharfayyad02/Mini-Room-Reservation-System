@@ -1,0 +1,105 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+   provider = "mysql"
+   url = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  OWNER
+  GUEST
+}
+
+enum RoomStatus {
+  AVAILABLE
+  UNAVAILABLE
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+
+
+
+model User {
+  id        BigInt @id @default(autoincrement()) @db.UnsignedBigInt
+  name      String @db.VarChar(255)
+  email     String @unique @db.VarChar(255)
+  password  String @db.VarChar(255)
+  role      Role   @default(GUEST)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  rooms     Room[]
+  bookings  Booking[]
+
+  // Indexes
+  @@index([name], map: "users_name_index")
+
+  // Map table name
+  @@map("users")
+}
+
+model Room {
+  id        BigInt @id @default(autoincrement()) @db.UnsignedBigInt
+  ownerId   BigInt @db.UnsignedBigInt @map("owner_id")
+  name      String @db.VarChar(255)
+  price     Float
+  capacity  Int
+  status    RoomStatus @default(AVAILABLE)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  owner     User   @relation(fields: [ownerId], references: [id])
+  bookings  Booking[]
+
+  // Indexes
+  @@index([ownerId], map: "rooms_owner_id_index")
+  @@index([price], map: "rooms_price_index")
+  @@index([capacity], map: "rooms_capacity_index")
+
+  // Map table name
+  @@map("rooms")
+}
+
+model Booking {
+  id        BigInt @id @default(autoincrement()) @db.UnsignedBigInt
+
+  guestId   BigInt @db.UnsignedBigInt @map("guest_id")
+  roomId    BigInt @db.UnsignedBigInt @map("room_id")
+
+  checkIn   DateTime @map("check_in")
+  checkOut  DateTime @map("check_out")
+
+  status    BookingStatus @default(PENDING)
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  guest     User @relation(fields: [guestId], references: [id])
+  room      Room @relation(fields: [roomId], references: [id])
+
+  // Indexes
+  @@index([guestId], map: "bookings_guest_id_index")
+  @@index([roomId], map: "bookings_room_id_index")
+  @@index([checkIn, checkOut], map: "bookings_date_range_index")
+
+  // Map table name
+  @@map("bookings")
+}
+
