@@ -18,9 +18,12 @@
     "skipLibCheck": true,
     "strictNullChecks": true,
     "forceConsistentCasingInFileNames": true,
-    "noImplicitAny": false,
-    "strictBindCallApply": false,
+    "noImplicitAny": true,
+    "strictBindCallApply": true,
     "noFallthroughCasesInSwitch": false,
+    "strict": true,
+    "strictFunctionTypes": true,
+    "strictPropertyInitialization": true,
     "paths": {"generated/prisma": ["generated/prisma"]}
   },
   "include": [

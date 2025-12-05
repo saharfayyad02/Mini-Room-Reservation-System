@@ -31,7 +31,11 @@ enum BookingStatus {
   CANCELLED
 }
 
-
+enum IdempotencyStatus {
+  IN_PROGRESS
+  COMPLETED
+  FAILD
+}
 
 model User {
   id        BigInt @id @default(autoincrement()) @db.UnsignedBigInt
@@ -103,3 +107,13 @@ model Booking {
   @@map("bookings")
 }
 
+model Idempotency {
+  idempotencyKey    String            @id @map("idempotency_key") @db.VarChar(255)
+  response          Json?
+  createdAt         DateTime          @default(now()) @map("created_at")
+  expiresAt         DateTime          @map("expires_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+  idempotencyStatus IdempotencyStatus @map("idempotency_status")
+
+  @@map("idempotencies")
+}

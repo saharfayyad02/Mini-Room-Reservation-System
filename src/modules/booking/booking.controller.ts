@@ -1,15 +1,17 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Req } from '@nestjs/common';
 import { BookingService } from './booking.service';
-import { CreateBookingDto } from './dto/create-booking.dto';
-import { UpdateBookingDto } from './dto/update-booking.dto';
+import type { CreateBookingDto, updatedBookingDto } from './dto/create-booking.dto';
+import { ZodValidationPipe } from 'src/pips/zod.validation.pipe';
+import { CreateBookingSchema } from './util/booking.validation.schema';
 
 @Controller('booking')
 export class BookingController {
   constructor(private readonly bookingService: BookingService) {}
 
-  @Post()
-  create(@Body() createBookingDto: CreateBookingDto) {
-    return this.bookingService.create(createBookingDto);
+  @Post('/create')
+  create(@Body(new ZodValidationPipe(CreateBookingSchema)) createBookingDto: CreateBookingDto,
+         @Req() req:Express.Request) {
+    return this.bookingService.create(createBookingDto, BigInt(req.user!.id));
   }
 
   @Get()
@@ -17,18 +19,10 @@ export class BookingController {
     return this.bookingService.findAll();
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.bookingService.findOne(+id);
-  }
 
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateBookingDto: UpdateBookingDto) {
-    return this.bookingService.update(+id, updateBookingDto);
-  }
+ @Patch(':id')
+ async update(@Param('id') id: bigint, @Req() req: Express.Request) {
+  return this.bookingService.update(BigInt(req.user!.id), BigInt(id));
+ }
 
-  @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.bookingService.remove(+id);
-  }
 }
