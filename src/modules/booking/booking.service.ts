@@ -3,6 +3,11 @@ import type { CreateBookingDto, updatedBookingDto } from './dto/create-booking.d
 import { DatabaseService } from '../database/database.service';
 import { Roles } from 'src/decoraters/roels.decore';
 import { UpdateRoomDto } from '../room/dto/Room.dto';
+import { MoneyUtil } from '../utils/money.util';
+import { Prisma, Room } from 'generated/prisma';
+import { PaginationQueryType } from 'src/types/util.types';
+import { removeFields } from '../utils/object';
+import { check } from 'zod';
 
 
 /**
@@ -15,12 +20,12 @@ import { UpdateRoomDto } from '../room/dto/Room.dto';
 @Injectable()
 export class BookingService {
   constructor(private databaseService : DatabaseService){}
-  // @Roles(["GUEST","ADMIN","OWNER"])
+  
   async create(createBookingDto: CreateBookingDto,userId: number | bigint) {
 
   const { roomId, checkIn, checkOut } = createBookingDto;
 
-   const booking = await this.databaseService.$transaction(async (prismaTx) => {
+   return await this.databaseService.$transaction(async (prismaTx) => {
     const room = await prismaTx.room.findUnique({
       where: { id: roomId },
     });
@@ -68,10 +73,17 @@ export class BookingService {
       data: { status: 'UNAVAILABLE'},
     });
 
-    return newBooking;
+    return {
+      ...newBooking,
+      roomDetails: {
+        name: room.name,
+        price: room.price,
+        capacity: room.capacity,
+      },
+    };
   });
 
-  return booking;
+
   }
 
  async update(guestId: bigint, bookingId: bigint) {
@@ -122,17 +134,31 @@ export class BookingService {
   return result;
 }
 
-  findAll() {
-    return `This action returns all booking`;
+// for guest id
+ my_bookings(user: Express.Request['user'], query: PaginationQueryType){
+    const pagination = this.databaseService.handleQueryPagination(query);
+    return this.databaseService.booking.findMany({
+      ...removeFields (pagination, ['page']),
+      where: { guestId: BigInt(user!.id) },
+      include: { room: true },
+    });
+ }
+
+  findAll(query: PaginationQueryType) {
+     const pagination = this.databaseService.handleQueryPagination(query);
+    return this.databaseService.booking.findMany({
+      ...removeFields (pagination, ['page']),
+      include: { room: true },
+    });
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} booking`;
+  findOne(id: bigint) {
+    return this.databaseService.booking.findUniqueOrThrow({
+      where: { id },
+      include: { room: true },
+    });
   }
 
- 
 
-  remove(id: number) {
-    return `This action removes a #${id} booking`;
-  }
+
 }

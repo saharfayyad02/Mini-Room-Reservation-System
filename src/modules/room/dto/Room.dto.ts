@@ -1,9 +1,15 @@
-import { Room } from "generated/prisma";
+import { Prisma, Room } from "generated/prisma";
 
 export type CreateRoomDTO = Omit<Room , 'id' | 'createdAt' | 'updatedAt' | 'ownerId'>
 
 
 export type UpdateRoomDto = Pick<Room , 'name' | 'price' | 'status' | 'capacity'>
+
+export type RoomResponseDto = Prisma.RoomGetPayload<{
+  include:{
+    Asset: true;
+  }
+}>;
 
 export type FilterRoomDTO = {
    createdAtFrom?: Date;

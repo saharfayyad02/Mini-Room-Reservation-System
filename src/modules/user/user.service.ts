@@ -79,10 +79,28 @@ export class UserService {
     })
   }
 
-  remove(id: bigint) {
-    return this.prismaDatabase.user.delete({
-      where:{id}
-    });
+  async remove(id: bigint, adminId: string) {
+
+    return this.prismaDatabase.$transaction(async (prisma) => {
+      // First, delete all bookings associated with the user
+      await prisma.booking.deleteMany({
+        where: { id: id },
+      });
+
+     await this.prismaDatabase.room.updateMany({
+
+        where: { ownerId: id },
+        data: { ownerId: BigInt(adminId) }, 
+      });
+
+      return prisma.user.findUniqueOrThrow({
+        where: { id: BigInt(adminId)},
+          include: {
+          rooms: true,
+          bookings: true,
+          },
+      })
+  })
   }
 
   mapwithoutPasswordAndCastBigInt(user:User):UserResponseDTO['user']{

@@ -6,9 +6,9 @@ import { PaginationQueryType } from "src/types/util.types";
 
 export const RoomValidationSchema = z.object({
     name: z.string().min(1).max(50),
-    capacity: z.number().min(1).max(500),
+    capacity: z.coerce.number().min(1).max(500),
     status: z.enum(["AVAILABLE","UNAVAILABLE"]),
-    price: z.number().min(0),
+    price: z.coerce.number().min(0),
 }) satisfies ZodType<CreateRoomDTO>;
 
 export const UpdateRoomValidationSchema = RoomValidationSchema.partial() satisfies ZodType<Partial<CreateRoomDTO>>;

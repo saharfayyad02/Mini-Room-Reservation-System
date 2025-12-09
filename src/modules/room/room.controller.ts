@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Req, Query ,UseInterceptors} from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Req, Query ,UseInterceptors, UploadedFile} from '@nestjs/common';
 import { RoomService } from './room.service';
 import type { CreateRoomDTO, FilterRoomDTO, UpdateRoomDto } from './dto/Room.dto';
 import { ZodValidationPipe } from 'src/pips/zod.validation.pipe';
@@ -6,6 +6,9 @@ import { FilterRoomSchema, RoomValidationSchema, UpdateRoomValidationSchema } fr
 import { Roles } from 'src/decoraters/roels.decore';
 import { paginationSchema } from '../utils/api.util';
 import { IdempotencyInterceptor } from '../interceptor/idempotency.interceptor';
+import { FileCleanupInterceptor } from '../file/cleanup-file.interceptor';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { stat } from 'fs';
 
 
 @Controller('room')
@@ -14,34 +17,50 @@ export class RoomController {
 
   @Post('/create')
   @Roles(["OWNER","ADMIN"])
-  @UseInterceptors(IdempotencyInterceptor)
+  @UseInterceptors(FileInterceptor('file'),FileCleanupInterceptor,IdempotencyInterceptor)
   create(@Body(new ZodValidationPipe(RoomValidationSchema)) createRoomDto: CreateRoomDTO,
          @Req() req: Express.Request,
+         @UploadedFile() file?: Express.Multer.File
              ) {
-    return this.roomService.create(createRoomDto,req.user);
+    return this.roomService.create(createRoomDto,req.user,file);
   }
 
-  // get avaliable rooms if the customer role is guest
-  // get all rooms with booking if the role is owner or admin
-  @Get()
-  @Roles(["OWNER","ADMIN","GUEST"])
-  async findAll(@Req() req: Express.Request,
+  // delete room by admin only
+  @Get('/my_rooms')
+  @Roles(["OWNER"])
+  async Owner_rooms(@Req() req: Express.Request,
                 @Query(new ZodValidationPipe(paginationSchema)) query: {page: 1; limit: 10;}) {
     return await this.roomService.findAll(req.user, query);
   }
 
-  // @Get(':id')
-  // findOne(@Param('id') id: string) {
-  //   return this.roomService.findOne(+id);
-  // }
+  @Get('/avaliable_rooms')
+  @Roles(["GUEST"])
+  async avaliable_rooms(@Req() req: Express.Request,
+                @Query(new ZodValidationPipe(paginationSchema)) query: {page: 1; limit: 10;}) {
+    return await this.roomService.findAll(req.user, query);
+  }
+
+  @Get('/all')
+  @Roles(["ADMIN"])
+  async GetAll(@Req() req: Express.Request,
+                @Query(new ZodValidationPipe(paginationSchema)) query: {page: 1; limit: 10;}) {
+    return await this.roomService.findAll(req.user, query);
+  }
+
+  @Get('all/:id')
+  @Roles(["ADMIN"])
+  findOne(@Param('id') id: bigint) {
+    return this.roomService.findOne(id);
+  }
 
   @Patch(':id')
   @Roles(["OWNER","ADMIN"])
-  @UseInterceptors(IdempotencyInterceptor)
+  @UseInterceptors(FileInterceptor('file'),FileCleanupInterceptor,IdempotencyInterceptor)
   update(@Param('id') id: bigint, 
          @Body(new ZodValidationPipe(UpdateRoomValidationSchema)) updateRoomDto: UpdateRoomDto,
-         @Req() req: Express.Request) {
-    return this.roomService.update(id, updateRoomDto,req.user);
+         @Req() req: Express.Request,
+         @UploadedFile() file?: Express.Multer.File) {
+    return this.roomService.update(id, updateRoomDto,req.user,file);
   }
 
   @Get('/available')
@@ -52,9 +71,4 @@ export class RoomController {
     
     return this.roomService.findAvailableRooms(filters);
   }
-
-  // @Delete(':id')
-  // remove(@Param('id') id: string) {
-  //   return this.roomService.remove(+id);
-  // }
 }

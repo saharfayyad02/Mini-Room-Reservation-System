@@ -25,6 +25,10 @@ enum RoomStatus {
   UNAVAILABLE
 }
 
+enum StorageProviderName{
+  IMAGE_KIT
+}
+
 enum BookingStatus {
   PENDING
   CONFIRMED
@@ -49,6 +53,7 @@ model User {
   // Relations
   rooms     Room[]
   bookings  Booking[]
+  Asset     Asset[]
 
   // Indexes
   @@index([name], map: "users_name_index")
@@ -70,6 +75,7 @@ model Room {
   // Relations
   owner     User   @relation(fields: [ownerId], references: [id])
   bookings  Booking[]
+  Asset     Asset[]
 
   // Indexes
   @@index([ownerId], map: "rooms_owner_id_index")
@@ -78,6 +84,23 @@ model Room {
 
   // Map table name
   @@map("rooms")
+}
+
+model Asset {
+  id                  BigInt              @id @default(autoincrement()) @db.UnsignedBigInt
+  storageProviderName StorageProviderName @default(IMAGE_KIT) @map("storage_provider_name")
+  fileId              String              @db.VarChar(255)
+  url                 String              @db.VarChar(255)
+  fileType            String              @db.VarChar(255)
+  fileSizeInKB        Int                 @db.UnsignedInt
+  ownerId             BigInt              @map("owner_id") @db.UnsignedBigInt
+  createdAt           DateTime            @default(now()) @map("created_at")
+  roomId              BigInt?             @map("room_id") @db.UnsignedBigInt
+  // Relations
+  owner               User                @relation(fields: [ownerId], references: [id])
+  room                Room?               @relation(fields: [roomId], references: [id])
+
+  @@map("assets")
 }
 
 model Booking {

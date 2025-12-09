@@ -5,6 +5,8 @@ import { DatabaseService } from '../database/database.service';
 import { PaginationQueryType } from 'src/types/util.types';
 import { BookingService } from '../booking/booking.service';
 import { removeFields } from '../utils/object';
+import { FileService } from '../file/file.service';
+import { SideEffectQueue } from '../utils/side-effec';
 
 
 /*
@@ -16,15 +18,24 @@ find all rooms with bookings
 
 @Injectable()
 export class RoomService {
-  constructor(private databasesevice: DatabaseService  ){}
-  create(createRoomDto: CreateRoomDTO, user:Express.Request['user']) {
+  constructor(private databasesevice: DatabaseService ,
+              private fileService: FileService,
+   ){}
+  create(createRoomDto: CreateRoomDTO, user:Express.Request['user'],file?: Express.Multer.File,) {
     const payload : Prisma.RoomUncheckedCreateInput = {
        ...createRoomDto,
        ownerId: Number(user?.id), 
     };
 
+    if (file) {
+      payload.Asset = {
+        create: this.fileService.createFileAssetData(file, Number(user!.id)),
+      };
+    }
+
     return this.databasesevice.room.create({
-        data: payload
+        data: payload,
+        include: { Asset: true },
     });
        
   }
@@ -32,34 +43,63 @@ export class RoomService {
  async findAll(user: Express.Request['user'], query: PaginationQueryType) {
     const pagination = await this.databasesevice.handleQueryPagination(query);
     return this.databasesevice.$transaction(async (prismaTX) => {
-      // If user is not a GUEST, return all rooms owned by the user with bookings
-      if (user?.role !== 'GUEST') {
-        console.log('owner or admin');
+      // If user is owner return there ids with bookings
+      // if user is admin return all rooms with bookings
+      // if guest return the avaliable rooms only
+      if (user?.role === 'OWNER') {
+        console.log('owner');
         return prismaTX.room.findMany({
           ...removeFields(pagination, ['page']),
-         // where: { ownerId: BigInt(user!.id) },
+          where: { ownerId: BigInt(user!.id) },
           include: { bookings: true },
         });
-      }
-
+      }else if (user?.role === 'ADMIN') {
+        console.log('admin');
+        return prismaTX.room.findMany({
+          ...removeFields(pagination, ['page']),
+          include: { bookings: true },
+        });
+      }else{
       // For GUEST, only return AVAILABLE rooms
       return prismaTX.room.findMany({
         ...removeFields(pagination, ['page']),
         where: { status: 'AVAILABLE' },
       });
+    }
+    
     });
+    
   }
 
   // findOne(id: number) {
   //   return `This action returns a #${id} room`;
   // }
 
- async update(id: bigint, updateRoomDto: UpdateRoomDto,user:Express.Request['user']) {
+ async update(id: bigint, updateRoomDto: UpdateRoomDto,user:Express.Request['user'],file?: Express.Multer.File) { 
+      const sideEffects = new SideEffectQueue();
 
-       const UpdateRoom = await this.databasesevice.$transaction(async (prismaTX) =>{
+      const UpdateRoom = await this.databasesevice.$transaction(async (prismaTX) =>{
+          if (file) {
+              await this.fileService.deleteProductAsset(
+                prismaTX,
+                Number(id),
+                Number(user!.id),
+                sideEffects,
+              );
+            }
+
             const room: Prisma.RoomUncheckedUpdateInput = {
                ...updateRoomDto
             };
+
+            if (file) {
+                room.Asset = {
+                create: this.fileService.createFileAssetData(
+                file,
+                Number(user!.id),
+              ),
+              };
+            }
 
             const existing = await prismaTX.room.findFirst({
               where: { 
@@ -72,15 +112,24 @@ export class RoomService {
             throw new NotFoundException('Not found or unauthorized');
           }
 
-            return await prismaTX.room.update({
+
+          return await prismaTX.room.update({
                where: { id:BigInt(id) },
-               data: room,            
-              });
+               data: room,       
+               include: { Asset: true },     
+          });
      });
+      await sideEffects.runAll();
       return UpdateRoom;
 
   }
 
+  findOne(id: bigint) {
+    return this.databasesevice.room.findUniqueOrThrow({
+          where:{ id: BigInt(id)}
+    })
+  
+  }
  async findAvailableRooms(filters: FilterRoomDTO) {
     const where: Prisma.RoomWhereInput = {
       status: 'AVAILABLE',
@@ -156,7 +205,4 @@ export class RoomService {
     };
 }
 
-  // remove(id: number) {
-  //   return `This action removes a #${id} room`;
-  // }
 }
